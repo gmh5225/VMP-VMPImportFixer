@@ -3,6 +3,8 @@
 #include <string_view>
 #include <functional>
 #include <variant>
+#include<map>
+#include<string>
 
 namespace pepp
 {
@@ -27,7 +29,16 @@ namespace pepp
 
 		Image<bitsize>*							m_image;
 		detail::Image_t<>::ImportDescriptor_t*	m_base;
+		detail::Image_t<>::ImportDescriptor_t*  m_newiidbase;
 		detail::Image_t<>::ImportAddressTable_t m_iat_base;
+	private:
+		detail::Image_t<>::ImportDescriptor_t* GetIIDEnd();
+		size_t GetAddedIIDNumber();
+		detail::Image_t<>::ImportDescriptor_t* GetAddedIIDFromModule(std::string_view module);
+		uint32_t GetEmptyOffsetAtNamePage();
+		uint32_t GetEmptyOffsetAtThunkData(size_t nPageIndex);
+		uint32_t GetEmptyOffsetAtImp(size_t nPageIndex);
+ 
 	public:
 		ImportDirectory() = default;
 
@@ -36,6 +47,8 @@ namespace pepp
 		void AddModuleImport(std::string_view module, std::string_view import, std::uint32_t* rva = nullptr);
 		void AddModuleImports(std::string_view module, std::initializer_list<std::string_view> imports, std::uint32_t* rva = nullptr);
 		void TraverseImports(const std::function<void(ModuleImportData_t*)>& cb_func);
+		void CleanModuleImport();
+		void RebuildIAT(std::unordered_map<std::string, std::vector<std::string>>& iattable);
 
 		void SetCharacteristics(std::uint32_t chrs) {
 			m_base->Characteristics = chrs;

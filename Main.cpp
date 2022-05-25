@@ -1,16 +1,17 @@
 #include "VMPImportFixer.hpp"
-
+#include"util.h"
 bool IsFileArchX64(std::filesystem::path path, bool* parsed = nullptr);
 
 template<size_t BitSize>
-IVMPImportFixer* VifFactory_GenerateFixer(std::string_view vmpsn) noexcept
+IVMPImportFixer* VifFactory_GenerateFixer(std::string_view vmpsn,std::string_view textsn, std::vector<std::string> vecScanIATSections) noexcept
 {
-	return new VMPImportFixer<BitSize>(vmpsn);
+	return new VMPImportFixer<BitSize>(vmpsn, textsn, vecScanIATSections);
 }
 
 int main(int argc, const char** argv)
 {
 	logger = spdlog::stdout_color_mt("console");
+	//logger = spdlog::basic_logger_mt("basic_logger", "logs/basic-log.txt");
 	logger->set_level(spdlog::level::debug);
 	logger->set_pattern("[%^%l%$] %v");
 
@@ -19,7 +20,9 @@ int main(int argc, const char** argv)
 		std::string_view sFilePathOrProc {};
 		std::string_view sTargetModule {};
 		std::string_view sVMPSectionName { ".vmp0" };
+		std::string_view sTextSectionName{ ".text" };
 		DWORD			 dwProcessId { 0ul };
+		std::vector<std::string> vecScanIATSections = { ".rdata",".idata" };
 
 		//
 		// Parse out arguments
@@ -72,6 +75,17 @@ int main(int argc, const char** argv)
 			{
 				sVMPSectionName = argv[++i];
 			}
+
+			if (_stricmp(argv[i], "-textsec") == 0 && (i + 1) < argc)
+			{
+				sTextSectionName = argv[++i];
+			}
+
+			if (_stricmp(argv[i], "-iatsecs") == 0 && (i + 1) < argc)
+			{
+				vecScanIATSections.clear();
+				util::split(argv[++i], vecScanIATSections, ';');
+			}
 		}
 
 		if (!sFilePathOrProc.empty() && std::filesystem::exists(sFilePathOrProc))
@@ -102,9 +116,9 @@ int main(int argc, const char** argv)
 				IsWow64Process(hProcess, &bIsWow64);
 
 				if (bIsWow64)
-					pImportFixer = VifFactory_GenerateFixer<32>(sVMPSectionName);
+					pImportFixer = VifFactory_GenerateFixer<32>(sVMPSectionName, sTextSectionName,vecScanIATSections);
 				else
-					pImportFixer = VifFactory_GenerateFixer<64>(sVMPSectionName);
+					pImportFixer = VifFactory_GenerateFixer<64>(sVMPSectionName, sTextSectionName,vecScanIATSections);
 
 				std::filesystem::create_directories("dumps");
 
@@ -122,17 +136,11 @@ int main(int argc, const char** argv)
 	}
 	else
 	{
-		std::cout << "VMPImportFixer: Resolve import calls in a VMProtect'd binary (developed by github.com/mike1k)" << std::endl;
-		std::cout <<
-			"Usage: \tVMPImportFixer\n  -proc \t(required) process name/process id" <<
-			std::endl;
-		std::cout << "  -mod: \t(optional) names of module to dump." << std::endl;
-		std::cout << "  -section: \t(optional) VMP section name to use if changed from default (VMP allows custom names)" << std::endl;
+		std::cout << "Code modified from github.com/mike1k" << std::endl;
 		
 		std::cout <<
 			"Example usages:\n"
-			"*\tVMPImportFixer -p 'test.exe'\n" <<
-			"*\tVMPImportFixer -p 123456 -mod vmp.dll -section .name0\n" <<
+			"*\tVMPImportFixer -p 123456 -mod test.exe -section .name0(可选默认为.vmp0) -textsec .name(可选默认为.text) -iatsecs .sec1;.sec2(可选默认为.rdata和.idata)\n" <<
 			std::endl;
 
 		std::cout << std::endl;
